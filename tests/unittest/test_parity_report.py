@@ -63,6 +63,17 @@ def test_render_skipped_reason():
     assert md == f"{HEADER}\n\n_No files under `src/` changed._\n"
 
 
+def test_render_escapes_table_pipes_and_backticks():
+    pred = {"summary": "a | b", "missing_languages": [
+        {"language": "Rust", "status": "needs_change", "reason": "x | y",
+         "targets": [{"path": "src/rust/a|b`.rs", "location": "fn a | b", "change": "c"}]}]}
+    md = render_report(_layout(), pred, model_used=True)
+    row = next(line for line in md.splitlines() if line.startswith("| rust |"))
+    assert row.replace("\\|", "").count("|") == 5  # 4 cells, no stray pipes
+    assert "a\\|b.rs" in row and "fn a \\| b" in row
+    assert "**What changed:** a \\| b" in md
+
+
 def test_render_tolerates_malformed_prediction_entries():
     bad = {"summary": "x", "missing_languages": ["not-a-dict", {"language": "rust", "status": "needs_change",
                                                                  "targets": ["oops", {"path": "a.rs"}]}],

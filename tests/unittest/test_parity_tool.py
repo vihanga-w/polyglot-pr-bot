@@ -208,7 +208,21 @@ def test_non_persistent_comment_and_provider_without_tree(monkeypatch, parity_se
     asyncio.run(tool.run())
     assert provider.persistent == []
     assert len(provider.comments) == 1
-    assert "would be a new file under `src/rust/`" in provider.comments[0]
+    assert "no matching file found under `src/rust/`" in provider.comments[0]
+
+
+def test_all_languages_changed_without_model_is_skipped(monkeypatch, parity_settings):
+    diff = [FilePatchInfo("", "", "+x\n", f"src/{lang}/a.{ext}", edit_type=EDIT_TYPE.MODIFIED)
+            for lang, ext in (("typescript", "ts"), ("rust", "rs"), ("golang", "go"), ("python", "py"))]
+    provider = FakeProvider(diff, tree=[f.filename for f in diff])
+    tool = _make(monkeypatch, provider, FakeAI(MODEL_YAML), {"use_llm": False})
+    asyncio.run(tool.run())
+    assert provider.persistent == []  # nothing to say without the model
+
+    provider = FakeProvider(diff, tree=[f.filename for f in diff])
+    tool = _make(monkeypatch, provider, FakeAI(MODEL_YAML), {"use_llm": True})
+    asyncio.run(tool.run())
+    assert len(provider.persistent) == 1  # model still reviews performance/distribution
 
 
 def test_parity_command_is_registered():

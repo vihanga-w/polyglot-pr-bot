@@ -16,12 +16,18 @@ _STATUS_LABEL = {
 }
 
 
-def _code(path: str) -> str:
-    return f"`{path}`"
+def _cell(text: str) -> str:
+    """Make text safe inside a GitHub table cell."""
+    return text.replace("|", "\\|")
+
+
+def _code(path: Any) -> str:
+    path = str(path or "").replace("`", "")
+    return _cell(f"`{path}`")
 
 
 def _one_line(text: Any) -> str:
-    return " ".join(str(text or "").split())
+    return _cell(" ".join(str(text or "").split()))
 
 
 def _by_language(prediction: dict | None) -> dict[str, dict]:
@@ -72,7 +78,7 @@ def render_report(layout: ParityLayout, prediction: dict | None = None, *, model
             if lang.candidates:
                 where = "<br>".join(_code(c.path) for c in lang.candidates[:3])
             else:
-                where = "no matching file; would be a new file under " + _code(lang.directory + "/")
+                where = "no matching file found under " + _code(lang.directory + "/") + " (may need a new file)"
         lines.append(f"| {lang.language} | {label} | — | {where} |")
     lines.append("")
 

@@ -122,11 +122,14 @@ class PRParity:
         layout = self.layout
         if not layout.in_layout:
             return (f"No files under `{self.config.root}/` changed; nothing to compare across implementations.")
-        if not layout.missing_languages and not (
-            self.config.check_performance or self.config.check_parallelism
-            or self.config.check_language_fit or self.config.check_distribution
-        ):
-            return "Every implementation was changed in this PR."
+        if not layout.missing_languages:
+            # Performance and distribution checks need the model; without it there is nothing left to say.
+            model_checks = self.config.use_llm and (
+                self.config.check_performance or self.config.check_parallelism
+                or self.config.check_language_fit or self.config.check_distribution
+            )
+            if not model_checks:
+                return "Every implementation was changed in this PR."
         return None
 
     def _publish(self, report: str) -> None:
@@ -188,7 +191,8 @@ class PRParity:
                 "language": lang.language,
                 "directory": lang.directory,
                 "files": files,
-                "suggested_new": suggested_new_paths(self.config, lang.language, touched_changed)[:3],
+                "suggested_new": suggested_new_paths(self.config, lang.language, touched_changed,
+                                                     directory=lang.directory)[:3],
             })
         return out
 

@@ -2182,6 +2182,7 @@ class GitLabProvider(GitProvider):
         if not ref or getattr(self, "gl", None) is None or getattr(self, "id_project", None) is None:
             return []
         paths: list[str] = []
+        max_pages = max(1, int(get_settings().config.per_directory_settings_max_tree_pages))
         page = 1
         try:
             project = self.gl.projects.get(self.id_project, lazy=True)
@@ -2191,6 +2192,12 @@ class GitLabProvider(GitProvider):
                     break
                 paths.extend(item["path"] for item in tree if item.get("type") == "blob")
                 if len(tree) < 100:
+                    break
+                if page >= max_pages:
+                    get_logger().warning(
+                        f"Repository tree at '{ref}' exceeds {max_pages} pages "
+                        "(config.per_directory_settings_max_tree_pages); using a partial listing"
+                    )
                     break
                 page += 1
         except Exception as e:  # noqa: BLE001 - a listing failure degrades to "no candidates"

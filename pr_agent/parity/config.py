@@ -7,6 +7,7 @@ of str so they map 1:1 onto form fields.
 """
 from __future__ import annotations
 
+import posixpath
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -42,8 +43,36 @@ DEFAULT_IGNORE_SEGMENTS = [
 ]
 
 
+# Directory names that may hold a configured language (first match wins).
+LANGUAGE_DIR_ALIASES: dict[str, tuple[str, ...]] = {
+    "typescript": ("typescript", "ts"),
+    "javascript": ("javascript", "js"),
+    "golang": ("golang", "go"),
+    "go": ("go", "golang"),
+    "python": ("python", "py"),
+    "rust": ("rust", "rs"),
+    "csharp": ("csharp", "cs", "dotnet"),
+    "cpp": ("cpp", "c++", "cxx"),
+    "kotlin": ("kotlin", "kt"),
+}
+
+
 def _normalize_dir(value: str) -> str:
-    return (value or "").strip().strip("/")
+    """Repository-relative POSIX directory without leading ``./`` or trailing ``/``; ``.`` means the root."""
+    text = str(value or "").strip().replace("\\", "/")
+    text = posixpath.normpath(text) if text else ""
+    if text in ("", "."):
+        return ""
+    return text.strip("/")
+
+
+def _as_str_list(value: Any) -> list[str]:
+    """Accept a list, a tuple, or a comma-separated string (what a dashboard or env var may send)."""
+    if value is None:
+        return []
+    if isinstance(value, str):
+        value = value.split(",")
+    return [str(item).strip() for item in value if str(item).strip()]
 
 
 @dataclass
@@ -78,9 +107,15 @@ class ParityConfig:
     def __post_init__(self):
         self.root = _normalize_dir(self.root)
         self.shared_dir = _normalize_dir(self.shared_dir)
-        self.languages = [lang.strip().lower() for lang in (self.languages or []) if str(lang).strip()]
-        self.max_candidates_per_language = max(1, int(self.max_candidates_per_language))
-        self.max_candidate_content_fetches = max(0, int(self.max_candidate_content_fetches))
+        self.languages = [lang.lower() for lang in _as_str_list(self.languages)]
+        self.ignore_path_segments = _as_str_list(self.ignore_path_segments)
+        self.service_dir_patterns = _as_str_list(self.service_dir_patterns)
+        try:
+            self.max_candidates_per_language = max(1, int(self.max_candidates_per_language))
+            self.max_candidate_content_fetches = max(0, int(self.max_candidate_content_fetches))
+        except (TypeError, ValueError) as e:
+            raise ValueError("pr_parity.max_candidates_per_language and max_candidate_content_fetches must be "
+                             f"integers: {e}") from None
 
     @classmethod
     def from_settings(cls, settings: Any = None) -> "ParityConfig":
@@ -118,6 +153,10 @@ class ParityConfig:
 
     def extensions_for(self, language: str) -> list[str]:
         return DEFAULT_LANGUAGE_EXTENSIONS.get(language.lower(), [])
+
+    def dir_names_for(self, language: str) -> tuple[str, ...]:
+        """Directory names under ``root`` that may hold *language*, most specific first."""
+        return LANGUAGE_DIR_ALIASES.get(language.lower(), (language.lower(),))
 
     def any_language_extensions(self) -> set[str]:
         exts: set[str] = set()
