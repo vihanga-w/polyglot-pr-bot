@@ -157,9 +157,3 @@ class ParityConfig:
     def dir_names_for(self, language: str) -> tuple[str, ...]:
         """Directory names under ``root`` that may hold *language*, most specific first."""
         return LANGUAGE_DIR_ALIASES.get(language.lower(), (language.lower(),))
-
-    def any_language_extensions(self) -> set[str]:
-        exts: set[str] = set()
-        for lang in self.languages:
-            exts.update(self.extensions_for(lang))
-        return exts
